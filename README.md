@@ -1,1 +1,1 @@
-# Intracranial-Hemorrhage
+# TRCLab-ICH
