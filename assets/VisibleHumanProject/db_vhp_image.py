@@ -3,29 +3,29 @@ import os
 from tqdm import tqdm
 
 import PATH
-import sqlite as sql
+from assets import sqlite as sql
 
 TABLE_VHP_TYPE = """
-    create table if not exists type
+    CREATE TABLE IF NOT EXISTS type
     (
-        id   integer not null
-            constraint type_pk
-                primary key autoincrement,
-        type integer not null
+        id   INTEGER NOT NULL
+            CONSTRAINT type_pk
+                PRIMARY KEY AUTOINCREMENT,
+        type TEXT NOT NULL
     );
 """
 
 TABLE_VHP_IMAGE = """
-    create table if not exists original
+    CREATE TABLE IF NOT EXISTS original
     (
-        id      integer not null
-            constraint original_pk
-                primary key autoincrement,
-        type_id integer not null
-            constraint original_type_null_fk
-                references type (id),
-        folder  TEXT    not null,
-        name    TEXT    not null
+        id      INTEGER NOT NULL
+            CONSTRAINT original_pk
+                PRIMARY KEY AUTOINCREMENT,
+        type_id INTEGER NOT NULL
+            CONSTRAINT original_type_null_fk
+                REFERENCES type (id),
+        folder  TEXT    NOT NULL,
+        name    TEXT    NOT NULL
     );
 """
 

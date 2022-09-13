@@ -1,6 +1,6 @@
 import os
 import PATH
-import sqlite as sql
+from assets import sqlite as sql
 from tqdm import tqdm
 
 # Database
