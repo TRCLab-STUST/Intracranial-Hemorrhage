@@ -80,6 +80,42 @@ TABLE_ICH_DICOM_INFO = """
     );
 """
 
+TABLE_ICH_MASK_IMAGE = """
+    create table if not exists  mask_image
+    (
+        id        INTEGER
+            constraint mask_image_pk
+                primary key autoincrement,
+        dataset_type_id   INTEGER not null
+            constraint mask_image_dataset_type_id_fk
+                references dataset_type,
+        folder    TEXT    not null,
+        name      TEXT    not null,
+        file_type_id INTEGER    not null
+            constraint mask_image_file_type_id_fk
+                references file_type
+    );
+"""
+
+TABLE_ICH_MASK_INFO = """
+    create table if not exists mask_info
+    (
+        id       INTEGER
+            constraint mask_info_pk
+                primary key autoincrement,
+        image_id INTEGER not null
+            constraint mask_info_dicom_image_id_fk
+                references dicom_image,
+        stage_id INTEGER not null
+            constraint mask_info_stage_id_fk
+                references stage,
+        ich_case   INTEGER not null,
+        image_index  INTEGER not null,
+        range_index  INTEGER not null,
+        ivh INTEGER not null 
+    );
+"""
+
 
 def check_dataset_exception(exception_map: dict, basename: str) -> bool:
     if basename in exception_map.keys():
@@ -104,6 +140,8 @@ def setup_database():
     sql.create_table(db, TABLE_ICH_STAGE)
     sql.create_table(db, TABLE_ICH_DICOM_IMAGE)
     sql.create_table(db, TABLE_ICH_DICOM_INFO)
+    sql.create_table(db, TABLE_ICH_MASK_IMAGE)
+    sql.create_table(db, TABLE_ICH_MASK_INFO)
     for ich_type in ICH_TYPE_LIST:
         sql.insert(db, "dataset_type",
                    data=[ich_type],
@@ -127,6 +165,7 @@ def main():
 
     image_file_list = glob2.glob(os.path.join(PATH.DATASET_ICH_V2, "**/*.*"))
     dicom_image_id = 1
+    mask_image_id = 1
     print("Create Image Tabel: ")
     for image_file_path in tqdm(image_file_list):
         basename = os.path.basename(image_file_path)
@@ -141,7 +180,6 @@ def main():
         stage_id = get_ich_dataset_stage(image_file_path)
         filename, filetype = basename.split(" ")[-1].split(".")
 
-        folder_name = ""
         if "probably-non-progression" in image_file_path:
             dataset_type_id = ICH_TYPE_LIST.index("probably-non-progression") + 1
             case, case_image_index = filename.split("-")
@@ -155,6 +193,7 @@ def main():
                        data=[dicom_image_id, stage_id, int(case), int(case_image_index)],
                        columns=["image_id", "stage_id", "ich_case", "image_index"])
             dicom_image_id += 1
+            pass
 
         elif "probably-progression" in image_file_path:
             dataset_type_id = ICH_TYPE_LIST.index("probably-progression") + 1
@@ -168,43 +207,81 @@ def main():
                        data=[dicom_image_id, stage_id, int(case), int(case_image_index)],
                        columns=["image_id", "stage_id", "ich_case", "image_index"])
             dicom_image_id += 1
+            pass
 
         elif "non-progression" in image_file_path:
-            folder_name = "non-progression"
+            dataset_type_id = ICH_TYPE_LIST.index("non-progression") + 1
+            folder = parent_dir.replace(PATH.DATASET_ICH_V2, "")[1:]
             case, case_image_id, range_with_type = filename.split("-")
             range_str = ''.join(filter(str.isdigit, range_with_type))
             range_str = "1" if range_str == "" else range_str
             mask_range = int(range_str)
-            mask_ivh = "V" in range_with_type
-            # print(case, case_image_id, mask_range, mask_ivh)
+            mask_ivh = 1 if "V" in range_with_type else 0
+            file_type_id = FILE_TYPE_LIST.index(filetype) + 1
+            sql.insert(db_ich, "mask_image",
+                       data=[dataset_type_id, folder, basename, file_type_id],
+                       columns=["dataset_type_id", "folder", "name", "file_type_id"])
+            sql.insert(db_ich, "mask_info",
+                       data=[int(mask_image_id), int(stage_id), int(case), int(case_image_id), int(mask_range), int(mask_ivh)],
+                       columns=["image_id", "stage_id", "ich_case", "image_index", "range_index", "ivh"])
+
+            mask_image_id += 1
 
         elif "progression" in image_file_path:
-            folder_name = "progression"
+            dataset_type_id = ICH_TYPE_LIST.index("progression") + 1
+            folder = parent_dir.replace(PATH.DATASET_ICH_V2, "")[1:]
             case, case_image_id, range_with_type = filename.split("-")
             range_str = ''.join(filter(str.isdigit, range_with_type))
             range_str = "1" if range_str == "" else range_str
             mask_range = int(range_str)
-            mask_ivh = "V" in range_with_type
-            # print(case, case_image_id, mask_range, mask_ivh)
+            mask_ivh = 1 if "V" in range_with_type else 0
+            file_type_id = FILE_TYPE_LIST.index(filetype) + 1
+            sql.insert(db_ich, "mask_image",
+                       data=[dataset_type_id, folder, basename, file_type_id],
+                       columns=["dataset_type_id", "folder", "name", "file_type_id"])
+            sql.insert(db_ich, "mask_info",
+                       data=[int(mask_image_id), int(stage_id), int(case), int(case_image_id), int(mask_range),
+                             int(mask_ivh)],
+                       columns=["image_id", "stage_id", "ich_case", "image_index", "range_index", "ivh"])
+
+            mask_image_id += 1
 
         elif "validation-dicom" in image_file_path:
-            folder_name = "validation-dicom"
-            case, _, case_image_id = filename.replace("_", "-").split("-")
+            dataset_type_id = ICH_TYPE_LIST.index("validation-dicom") + 1
+            case, _, case_image_index = filename.replace("_", "-").split("-")
+            folder = parent_dir.replace(PATH.DATASET_ICH_V2, "")[1:]
+            file_type_id = FILE_TYPE_LIST.index(filetype) + 1
 
-            # print(filename.split("-"))
+            sql.insert(db_ich, "dicom_image",
+                       data=[dataset_type_id, folder, basename, file_type_id],
+                       columns=["dataset_type_id", "folder", "name", "file_type_id"])
+            sql.insert(db_ich, "dicom_info",
+                       data=[dicom_image_id, stage_id, int(case), int(case_image_index)],
+                       columns=["image_id", "stage_id", "ich_case", "image_index"])
+            dicom_image_id += 1
 
         elif "validation-mask" in image_file_path:
-            folder_name = "validation-mask"
             filename_split = filename.replace("_", "-").split("-")
             if len(filename_split) == 3:
                 filename_split.append("1")
 
+            dataset_type_id = ICH_TYPE_LIST.index("validation-mask") + 1
+            folder = parent_dir.replace(PATH.DATASET_ICH_V2, "")[1:]
             case, _, case_image_id, range_with_type = filename_split
             range_str = ''.join(filter(str.isdigit, range_with_type))
             range_str = "1" if range_str == "" else range_str
             mask_range = int(range_str)
-            mask_ivh = "V" in range_with_type
-            # print(case, case_image_id, mask_range, mask_ivh)
+            mask_ivh = 1 if "V" in range_with_type else 0
+            file_type_id = FILE_TYPE_LIST.index(filetype) + 1
+            sql.insert(db_ich, "mask_image",
+                       data=[dataset_type_id, folder, basename, file_type_id],
+                       columns=["dataset_type_id", "folder", "name", "file_type_id"])
+            sql.insert(db_ich, "mask_info",
+                       data=[int(mask_image_id), int(stage_id), int(case), int(case_image_id), int(mask_range),
+                             int(mask_ivh)],
+                       columns=["image_id", "stage_id", "ich_case", "image_index", "range_index", "ivh"])
+
+            mask_image_id += 1
 
 
 if __name__ == '__main__':
