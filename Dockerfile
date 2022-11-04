@@ -22,9 +22,13 @@ RUN --mount=type=cache,target=/root/.cache \
     rm -rf /var/lib/apt/lists/* && \
     jupyter-lab --generate-config && \
     jupyter labextension enable && \
-    sed -i "s/# c.ServerApp.password = ''/c.ServerApp.password = 'argon2:\$argon2id\$v=19\$m=10240,t=10,p=8\$z2AHb3647NEb9JqeQpGswg\$jwnLW1OAy53k\/Ci5QH+uaN0TutcnnGczJT9VGQVLnyY'/g" /root/.jupyter/jupyter_lab_config.py
+    sed -i "s/# c.ServerApp.password = ''/c.ServerApp.password = 'argon2:\$argon2id\$v=19\$m=10240,t=10,p=8\$z2AHb3647NEb9JqeQpGswg\$jwnLW1OAy53k\/Ci5QH+uaN0TutcnnGczJT9VGQVLnyY'/g" /root/.jupyter/jupyter_lab_config.py && \
+    sed -i "s/# c.ServerApp.password_required = False/c.ServerApp.password_required = True/g" /root/.jupyter/jupyter_lab_config.py && \
+    sed -i "s/# c.ServerApp.port = 0/c.ServerApp.port = 8888/g" /root/.jupyter/jupyter_lab_config.py && \
+    sed -i "s/# c.ServerApp.allow_root = False/c.ServerApp.allow_root = True/g" /root/.jupyter/jupyter_lab_config.py && \
+    sed -i "s/# c.ServerApp.ip = 'localhost'/c.ServerApp.ip = '*'/g" /root/.jupyter/jupyter_lab_config.py
 
-CMD ["jupyter-lab", "--notebook-dir=/ich", "--allow-root", "--no-browser", "--ip=0.0.0.0", "--ServerApp.password_required=true"]
+CMD ["jupyter-lab"]
 EXPOSE 8888
 
 
