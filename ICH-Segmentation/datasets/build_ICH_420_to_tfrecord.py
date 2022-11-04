@@ -1,16 +1,16 @@
+import albumentations as A
 import argparse
-import os.path
-
-import mount_dataset
-import numpy as np
+import cv2
 import jax.numpy as jnp
+import matplotlib.pyplot as plt
+import numpy as np
+import os
 import tensorflow as tf
 from tqdm import tqdm
-import matplotlib.pyplot as plt
-from NII_Data import NII_Data
-import albumentations as A
-import cv2
+
 import build_data
+import mount_dataset
+from NII_Data import NIIData
 
 DATASET_DIR = "ICH_420"
 OUTPUT_DIR = tf.io.gfile.join(DATASET_DIR, "tfrecords")
@@ -92,7 +92,7 @@ def normalize(paired_slices):
 
 def _convert_dataset(paired_file, file_id):
     filename = os.path.basename(paired_file[0])
-    nii_data = NII_Data(paired_file, (0, 90))
+    nii_data = NIIData(paired_file, (0, 90))
     paired_slices = normalize(nii_data.extract_paired_slices())
     with tf.io.TFRecordWriter(
             tf.io.gfile.join(
@@ -120,7 +120,7 @@ def main(args):
 
 
 if __name__ == '__main__':
-    mount_dataset.mount_ICH_420_dataset(DATASET_DIR)
+    mount_dataset.mount_ich_420_dataset(DATASET_DIR)
     parser = argparse.ArgumentParser()
     parser.add_argument("--images",
                         default="ICH_420/Images/*.nii.gz",

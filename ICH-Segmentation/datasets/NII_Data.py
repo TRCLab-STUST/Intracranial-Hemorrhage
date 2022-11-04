@@ -1,8 +1,8 @@
-import nibabel as nib
 import jax.numpy as jnp
+import nibabel as nib
 
 
-class NII_Data:
+class NIIData:
     def __init__(self, paired_file, ct_range=(0, 90)):
         self._paired_file = paired_file
         self._ct_range = ct_range
@@ -22,11 +22,11 @@ class NII_Data:
         result = []
         for idx, nii_file in enumerate(self._paired_file):
             nii_data = nib.load(nii_file)
-            nii_dataobj = nii_data.dataobj
-            slices = nii_dataobj.get_unscaled()
+            nii_data_obj = nii_data.dataobj
+            slices = nii_data_obj.get_unscaled()
             if idx == 0:
-                slope = nii_dataobj.slope
-                intercept = nii_dataobj.inter
+                slope = nii_data_obj.slope
+                intercept = nii_data_obj.inter
                 slices = self._adjust_image_window(slices, slope, intercept, bit=bit, dtype=dtype)
 
             result.append(slices)

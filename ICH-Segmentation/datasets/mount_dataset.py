@@ -15,7 +15,6 @@ def _mount(host, remote_dir, local_dir):
     os.system(f"mount -t nfs {host}:{remote_dir} {local_dir}")
 
 
-def mount_ICH_420_dataset(mount_dir):
+def mount_ich_420_dataset(mount_dir):
     if not os.path.ismount(mount_dir):
         _mount(os.getenv("NFS_HOST"), os.getenv("NFS_ICH420_DIR"), mount_dir)
-

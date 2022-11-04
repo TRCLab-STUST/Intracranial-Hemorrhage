@@ -1,0 +1,13 @@
+nibabel
+opencv-python-headless
+opencv-contrib-python-headless
+imgaug
+albumentations
+scipy
+scikit-learn
+pandas
+matplotlib
+seaborn
+cython
+Pillow
+IPython[All]
