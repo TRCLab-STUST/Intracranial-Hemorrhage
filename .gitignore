@@ -1,9 +1,11 @@
 ### Custom
-assets/**/*.tif
-assets/**/*.dcm
-assets/**/*.jpg
-assets/**/*.bmp
-assets/**/*.png
+**/datasets/**/*.png
+**/datasets/**/*.dcm
+**/datasets/**/*.nii
+**/datasets/**/*.jpg
+**/datasets/**/*.bmp
+**/datasets/**/*.gif
+**/datasets/**/*.tif
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
