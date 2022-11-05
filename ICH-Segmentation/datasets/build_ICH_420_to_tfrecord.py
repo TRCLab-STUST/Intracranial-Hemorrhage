@@ -9,7 +9,6 @@ import tensorflow as tf
 from tqdm import tqdm
 
 import build_data
-import mount_dataset
 from NII_Data import NIIData
 
 
@@ -135,7 +134,6 @@ def main(args):
 if __name__ == '__main__':
     CURRENT_DIR = os.path.abspath(os.path.join(__file__, os.pardir))
     DATASET_DIR = os.path.join(CURRENT_DIR, "ICH_420")
-    mount_dataset.mount_ich_420_dataset(DATASET_DIR)
     parser = argparse.ArgumentParser()
     parser.add_argument("--list_folder",
                         default=tf.io.gfile.join(
@@ -158,4 +156,3 @@ if __name__ == '__main__':
                         help="輸出轉換為 TFRecord 的路徑"
                         )
     main(parser.parse_args())
-    mount_dataset.umount(DATASET_DIR)
