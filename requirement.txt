@@ -11,3 +11,4 @@ seaborn
 cython
 Pillow
 IPython[All]
+python-dotenv

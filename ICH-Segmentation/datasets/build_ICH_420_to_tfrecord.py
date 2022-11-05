@@ -12,9 +12,6 @@ import build_data
 import mount_dataset
 from NII_Data import NIIData
 
-DATASET_DIR = "ICH_420"
-OUTPUT_DIR = tf.io.gfile.join(DATASET_DIR, "tfrecords")
-
 
 def get_paired_dataset(image_patten, annotation_patten):
     images = tf.io.gfile.glob(image_patten)
@@ -71,8 +68,10 @@ def crop_and_padding(images, masks, c_points, scale=512):
         min_pos = jnp.clip(min_pos, 0, scale).astype(dtype=jnp.uint16)
         max_pos = jnp.clip(max_pos, 0, scale).astype(dtype=jnp.uint16)
         transform = A.Compose([
-            A.Crop(x_min=min_pos[0], y_min=min_pos[1], x_max=max_pos[0], y_max=max_pos[1]),
-            A.PadIfNeeded(min_height=scale, min_width=scale, border_mode=cv2.BORDER_CONSTANT, value=0)
+            A.Crop(x_min=min_pos[0], y_min=min_pos[1],
+                   x_max=max_pos[0], y_max=max_pos[1]),
+            A.PadIfNeeded(min_height=scale, min_width=scale,
+                          border_mode=cv2.BORDER_CONSTANT, value=0)
         ])
 
         transformed = transform(image=np.asarray(image), mask=np.asarray(mask))
@@ -90,49 +89,73 @@ def normalize(paired_slices):
     return jnp.asarray((images, masks))
 
 
-def _convert_dataset(paired_file, file_id):
-    filename = os.path.basename(paired_file[0])
-    nii_data = NIIData(paired_file, (0, 90))
-    paired_slices = normalize(nii_data.extract_paired_slices())
-    with tf.io.TFRecordWriter(
-            tf.io.gfile.join(
-                OUTPUT_DIR,
-                f"ich-{str(file_id).zfill(4)}.tfrecord"
-            )
-    ) as writer:
-        for idx in range(paired_slices.shape[1]):
-            image = paired_slices[0, idx, :, :]
-            mask = paired_slices[1, idx, :, :]
-            example = build_data.image_seg_to_tfexample(
-                image_filename=filename,
-                slice_number=idx,
-                sample=mask.any(),
-                image_raw=tf.io.serialize_tensor(image),
-                mask_raw=tf.io.serialize_tensor(mask)
-            )
-            writer.write(example.SerializeToString())
+def _convert_dataset(paired_filepaths, split_name, output_dir):
+    num_paired_filepath = len(paired_filepaths)
+    idx = 0
+    for paired_file in tqdm(paired_filepaths, position=1, desc="Paired"):
+        filename = os.path.basename(paired_file[0])
+        nii_data = NIIData(paired_file, (0, 90))
+        paired_slices = normalize(nii_data.extract_paired_slices())
+        
+        idx += 1
+        with tf.io.TFRecordWriter(
+                tf.io.gfile.join(
+                    output_dir,
+                    f"{split_name}-{str(idx).zfill(4)}-of-{str(num_paired_filepath).zfill(4)}.tfrecord"
+                )
+        ) as writer:
+            for idx in range(paired_slices.shape[1]):
+                image = paired_slices[0, idx, :, :]
+                mask = paired_slices[1, idx, :, :]
+                example = build_data.image_seg_to_tfexample(
+                    image_filename=filename,
+                    slice_number=idx,
+                    sample=mask.any(),
+                    image_raw=tf.io.serialize_tensor(image),
+                    mask_raw=tf.io.serialize_tensor(mask)
+                )
+                writer.write(example.SerializeToString())
 
 
 def main(args):
-    paired_dataset = get_paired_dataset(args.images, args.annotations)
-    for idx, paired_file in tqdm(enumerate(paired_dataset), desc="Paired"):
-        _convert_dataset(paired_file, idx)
+    dataset_splits = tf.io.gfile.glob(os.path.join(args.list_folder, "*.txt"))
+    for dataset_split in tqdm(dataset_splits, position=0, desc="Processing"):
+        split_name = os.path.basename(dataset_split).split(".")[0]
+        output_dir = os.path.join(args.output, split_name)
+        os.makedirs(output_dir, exist_ok=True)
+
+        paired_filepaths = [x.strip("\n").split(",") for x in open(
+            dataset_split, "r", encoding="utf-8")]
+        paired_filepaths = [(os.path.join(args.images, paired_filename[0]), os.path.join(
+            args.annotations, paired_filename[1])) for paired_filename in paired_filepaths]
+
+        _convert_dataset(paired_filepaths, split_name, output_dir)
 
 
 if __name__ == '__main__':
+    CURRENT_DIR = os.path.abspath(os.path.join(__file__, os.pardir))
+    DATASET_DIR = os.path.join(CURRENT_DIR, "ICH420")
     mount_dataset.mount_ich_420_dataset(DATASET_DIR)
     parser = argparse.ArgumentParser()
+    parser.add_argument("--list_folder",
+                        default=tf.io.gfile.join(
+                            CURRENT_DIR, "ICH_420", "ImageSets", "Segmentation"),
+                        help="包含訓練和驗證列表的資料夾"
+                        )
     parser.add_argument("--images",
-                        default="ICH_420/Images/*.nii.gz",
-                        help="Dataset images file_template"
+                        default=tf.io.gfile.join(
+                            CURRENT_DIR, "ICH_420", "Images"),
+                        help="包含影像的資料夾"
                         )
     parser.add_argument("--annotations",
-                        default="ICH_420/Labels/*_label.nii.gz",
-                        help="Dataset Annotations file_template"
+                        default=tf.io.gfile.join(
+                            CURRENT_DIR, "ICH_420", "Labels"),
+                        help="包含語義分割標記的資料夾"
                         )
     parser.add_argument("--output",
-                        default="ICH_420/tfrecords",
-                        help="tfrecord output folder"
+                        default=tf.io.gfile.join(
+                            CURRENT_DIR, "ICH_420", "TFRecords"),
+                        help="輸出轉換為 TFRecord 的路徑"
                         )
     main(parser.parse_args())
     mount_dataset.umount(DATASET_DIR)
