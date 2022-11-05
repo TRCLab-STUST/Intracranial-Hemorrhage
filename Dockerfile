@@ -1,4 +1,4 @@
-FROM tensorflow/tensorflow:2.9.0-gpu AS tf-gpu
+FROM tensorflow/tensorflow:2.10.0-gpu AS tf-gpu
 WORKDIR /ich
 RUN --mount=type=cache,target=/root/.cache \
     sed -i 's/archive.ubuntu.com/tw.archive.ubuntu.com/g' /etc/apt/sources.list && \
