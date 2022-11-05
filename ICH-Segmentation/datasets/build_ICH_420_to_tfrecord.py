@@ -91,17 +91,17 @@ def normalize(paired_slices):
 
 def _convert_dataset(paired_filepaths, split_name, output_dir):
     num_paired_filepath = len(paired_filepaths)
-    idx = 0
+    num_id = 0
     for paired_file in tqdm(paired_filepaths, position=1, desc="Paired"):
         filename = os.path.basename(paired_file[0])
         nii_data = NIIData(paired_file, (0, 90))
         paired_slices = normalize(nii_data.extract_paired_slices())
         
-        idx += 1
+        num_id += 1
         with tf.io.TFRecordWriter(
                 tf.io.gfile.join(
                     output_dir,
-                    f"{split_name}-{str(idx).zfill(4)}-of-{str(num_paired_filepath).zfill(4)}.tfrecord"
+                    f"{split_name}-{str(num_id).zfill(4)}-of-{str(num_paired_filepath).zfill(4)}.tfrecord"
                 )
         ) as writer:
             for idx in range(paired_slices.shape[1]):
