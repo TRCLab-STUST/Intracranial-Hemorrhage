@@ -12,3 +12,5 @@ cython
 Pillow
 IPython[All]
 python-dotenv
+Keras-Applications
+efficientnet

@@ -1,8 +1,30 @@
 import argparse
+import core.segmentation_models as sm
+from keras.utils import Sequence
+
+EPOCH = 100
+BS = 8
 
 
 def main(args):
-    pass
+    model = sm.Unet(
+        backbone_name="senet154",
+        input_shape=(512, 512, 1),
+        encoder_weights="None"
+        )
+    
+    model.compile(
+        'Adam',
+        loss=sm.losses.dice_loss,
+        metrics=[sm.metrics.iou_score, sm.metrics.f1_score],
+    )
+    
+    model.fit_generator(
+        generator=Sequence,
+        epoch=EPOCH,
+        batch_size=BS,
+        use_multiprocessing=True
+    )
 
 
 if __name__ == '__main__':
