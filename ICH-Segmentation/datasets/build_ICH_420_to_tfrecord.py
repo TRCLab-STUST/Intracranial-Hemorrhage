@@ -134,7 +134,7 @@ def main(args):
 
 if __name__ == '__main__':
     CURRENT_DIR = os.path.abspath(os.path.join(__file__, os.pardir))
-    DATASET_DIR = os.path.join(CURRENT_DIR, "ICH420")
+    DATASET_DIR = os.path.join(CURRENT_DIR, "ICH_420")
     mount_dataset.mount_ich_420_dataset(DATASET_DIR)
     parser = argparse.ArgumentParser()
     parser.add_argument("--list_folder",
