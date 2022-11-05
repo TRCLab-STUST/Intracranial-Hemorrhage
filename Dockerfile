@@ -27,8 +27,9 @@ RUN --mount=type=cache,target=/root/.cache \
     sed -i "s/# c.ServerApp.port = 0/c.ServerApp.port = 8888/g" /root/.jupyter/jupyter_lab_config.py && \
     sed -i "s/# c.ServerApp.allow_root = False/c.ServerApp.allow_root = True/g" /root/.jupyter/jupyter_lab_config.py && \
     sed -i "s/# c.ServerApp.ip = 'localhost'/c.ServerApp.ip = '*'/g" /root/.jupyter/jupyter_lab_config.py
-
 CMD ["jupyter-lab"]
 EXPOSE 8888
 
-
+FROM tf-gpu-jupyter AS tf-gpu-vscode
+RUN curl -fsSL https://code-server.dev/install.sh | sh
+CMD [ "code-server", "/ich" ]

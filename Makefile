@@ -8,8 +8,7 @@ help: ## This help message
 
 build: build-gpu ## Build Image From Dockerfile
 
-# gpu-vscode-image
-build-gpu: gpu-image gpu-jupyter-image
+build-gpu: gpu-image gpu-jupyter-image gpu-vscode-image
 
 gpu-image:
 	docker build . -t $(DOCKER_USER)/$(IMAGE_NAME):$(IMAGE_VERSION_TAG) --target tf-gpu
@@ -17,5 +16,5 @@ gpu-image:
 gpu-jupyter-image:
 	docker build . -t $(DOCKER_USER)/$(IMAGE_NAME):$(IMAGE_VERSION_TAG)-jupyter --target tf-gpu-jupyter
 
-#gpu-vscode-image:
-#	docker build . -t $(DOCKER_USER)/$(IMAGE_NAME):latest-vscode --target tf-gpu-vscode
+gpu-vscode-image:
+	docker build . -t $(DOCKER_USER)/$(IMAGE_NAME):$(IMAGE_VERSION_TAG)-vscode --target tf-gpu-vscode
