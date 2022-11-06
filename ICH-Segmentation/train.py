@@ -46,11 +46,12 @@ def load_dataset(filenames):
     
     return dataset
 
-def get_dataset(filenames, batch=4):
+def get_dataset(filenames, batch=4, repeat=False):
     dataset = load_dataset(filenames)
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
     dataset = dataset.batch(batch)
-    dataset = dataset.repeat()
+    if repeat:
+        dataset = dataset.repeat()
     
     return dataset
 
@@ -64,12 +65,13 @@ def main(args):
     print(f"Train: {len(x_list)}")
     print(f"Test: {len(y_list)}")
     
-    train_dataset = get_dataset(train_dataset_filepaths, batch=args.batch)
-    test_dataset = get_dataset(test_dataset_filepaths)
+    x_dataset = get_dataset(x_list, batch=args.batch, repeat=True)
+    y_dataset = get_dataset(y_list, batch=args.batch)
     
     # Build Model
     preprocess_input = sm.get_preprocessing(args.backbone)
-    train_dataset = preprocess_input(train_dataset)
+    x_dataset = preprocess_input(x_dataset)
+    y_dataset = preprocess_input(y_dataset)
     model = sm.Unet(args.backbone, encoder_weights=None, input_shape=(None, None, 1))
 
     model.compile(
@@ -80,10 +82,10 @@ def main(args):
     
     # Training
     model.fit(
-        train_dataset,
+        x_dataset,
         epochs=args.epoch,
         steps_per_epoch=args.steps,
-        validation_data=test_dataset,
+        validation_data=y_dataset,
         verbose=args.verbose
     )
     
@@ -105,7 +107,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--epoch",
-        default=100,
+        default=10,
         help="Training Epoch",
         type=int
     )
