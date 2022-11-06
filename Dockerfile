@@ -18,7 +18,7 @@ RUN --mount=type=cache,target=/root/.cache \
     apt-get update && \
     curl -fsSL https://deb.nodesource.com/setup_18.x | bash - &&\
     apt-get install nodejs -y --no-install-recommends && \
-    pip install jupyterlab jupyterlab-lsp nbresuse && \
+    pip install jupyterlab jupyterlab-lsp nbresuse jedi-language-server && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     jupyter-lab --generate-config && \

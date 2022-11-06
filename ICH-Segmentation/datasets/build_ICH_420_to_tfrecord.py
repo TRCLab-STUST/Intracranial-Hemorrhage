@@ -6,7 +6,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import tensorflow as tf
-from tqdm import tqdm
+import math
+from tqdm import tqdm, trange
 
 import build_data
 from NII_Data import NIIData
@@ -54,7 +55,8 @@ def extract_head_image_and_center_point(images, bit=12):
         extract_image = origin_img * mask
         result.append(extract_image)
         points.append((c_x, c_y))
-    return jnp.asarray(result), points
+        
+    return jnp.asarray(result, dtype=jnp.uint16), points
 
 
 def crop_and_padding(images, masks, c_points, scale=512):
@@ -72,48 +74,58 @@ def crop_and_padding(images, masks, c_points, scale=512):
             A.PadIfNeeded(min_height=scale, min_width=scale,
                           border_mode=cv2.BORDER_CONSTANT, value=0)
         ])
-
+        
         transformed = transform(image=np.asarray(image), mask=np.asarray(mask))
         result.append([transformed["image"], transformed["mask"]])
-
-    result = jnp.asarray(result)
+    
+    result = jnp.asarray(result, dtype=jnp.uint16)
     return result[:, 0, :, :], result[:, 1, :, :]
 
 
 def normalize(paired_slices):
-    images = paired_slices[0].T
-    masks = paired_slices[1].T
-    images, c_points = extract_head_image_and_center_point(images)
-    images, masks = crop_and_padding(images, masks, c_points)
+    images, masks = paired_slices[0].T, paired_slices[1].T 
+    images, c_points = extract_head_image_and_center_point(images)    
+    images, masks = crop_and_padding(images, masks, c_points)    
     return jnp.asarray((images, masks))
 
 
+
+_NUM_SHARDS = 4
 def _convert_dataset(paired_filepaths, split_name, output_dir):
     num_paired_filepath = len(paired_filepaths)
-    num_id = 0
-    for paired_file in tqdm(paired_filepaths, position=1, desc="Paired"):
-        filename = os.path.basename(paired_file[0])
-        nii_data = NIIData(paired_file, (0, 90))
-        paired_slices = normalize(nii_data.extract_paired_slices())
-        
-        num_id += 1
-        with tf.io.TFRecordWriter(
-                tf.io.gfile.join(
-                    output_dir,
-                    f"{split_name}-{str(num_id).zfill(4)}-of-{str(num_paired_filepath).zfill(4)}.tfrecord"
-                )
-        ) as writer:
-            for idx in range(paired_slices.shape[1]):
-                image = paired_slices[0, idx, :, :]
-                mask = paired_slices[1, idx, :, :]
-                example = build_data.image_seg_to_tfexample(
-                    image_filename=filename,
-                    slice_number=idx,
-                    sample=mask.any(),
-                    image_raw=tf.io.serialize_tensor(image),
-                    mask_raw=tf.io.serialize_tensor(mask)
-                )
-                writer.write(example.SerializeToString())
+    num_per_shard = int(math.ceil(num_paired_filepath / _NUM_SHARDS))
+    
+    for shard_id in trange(_NUM_SHARDS, position=1, desc=f"Shards-{split_name}"):
+        output_filepath = os.path.join(
+            output_dir,
+            f"{split_name}-{shard_id}-of-{_NUM_SHARDS}.tfrecord"
+        )
+        with tf.io.TFRecordWriter(output_filepath,
+                                  options=tf.io.TFRecordOptions(
+                                      compression_type="GZIP",
+                                      compression_level=9
+                                  )) as writer:
+            start_idx = shard_id * num_per_shard
+            end_idx = min((shard_id + 1) * num_per_shard, num_paired_filepath)
+            for idx in trange(start_idx, end_idx, position=2, desc="Nii"):
+                paired_file = paired_filepaths[idx]
+                filename_encode = os.path.basename(paired_file[0]).encode()
+                nii_data = NIIData(paired_file, (0, 90))
+                paired_slices = normalize(nii_data.extract_paired_slices())
+                
+                for n in trange(paired_slices.shape[1], position=3, desc="Slices"):
+                    image = jnp.expand_dims(paired_slices[0, n, :, :], axis=-1)
+                    mask = jnp.expand_dims(paired_slices[1, n, :, :], axis=-1)
+                                       
+                    example = build_data.image_seg_to_tfexample(
+                        image_filename=filename_encode,
+                        slice_number=n,
+                        sample=mask.any(),
+                        image_raw=tf.io.encode_png(image, compression=9),
+                        mask_raw=tf.io.encode_png(mask, compression=9)
+                    )
+
+                    writer.write(example.SerializeToString())
 
 
 def main(args):

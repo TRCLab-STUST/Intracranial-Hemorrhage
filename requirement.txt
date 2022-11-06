@@ -14,3 +14,4 @@ IPython[All]
 python-dotenv
 Keras-Applications
 efficientnet
+segmentation-models
