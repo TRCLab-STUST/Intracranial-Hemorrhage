@@ -1,91 +1,135 @@
 import os
+import random
 import argparse
-import core.segmentation_models as sm
-from keras.utils import Sequence
-
-EPOCH = 100
-BS = 8
+import numpy as np
+import tensorflow as tf
+import segmentation_models as sm
 
 
-# def split_dataset(tfrecords_path, test_rate=0.2, buffer_size=10000):
-#     dataset = tf.data.Dataset(os.path.join(tfrecords_path, "*."))
-#     dataset = dataset.shuffle(buffer_size, reshuffle_each_iteration=False)
-#
-#     if test_rate:
-#         sep = int(1.0 / test_rate)
-#
-#         def is_test(x, y):
-#             return x % sep == 0
-#
-#         def is_train(x, y):
-#             return not is_test(x, y)
-#
-#         def recover(x, y):
-#             return y
-#
-#         test_dataset = dataset.enumerate(start=1).filter(is_test).map(recover)
-#         train_dataset = dataset.enumerate(start=1).filter(is_train).map(recover)
-#
-#     else:
-#         test_dataset, test_dataset = dataset, None
-#
-#     return train_dataset, test_dataset
+def split_train_test(tfrecords_pattern, rate=0.8, buffer_size=10000):
+    filenames = tf.io.gfile.glob(tfrecords_pattern)
+    random.shuffle(filenames)
+    split_idx = int(len(filenames) * rate)
+    
 
+    return filenames[:split_idx], filenames[split_idx:]
 
-def build_unet_model():
-    model = sm.Unet(
-        backbone_name="senet154",
-        input_shape=(512, 512, 1),
-        encoder_weights="None"
+def decode_image(image, bit=12):
+    image = tf.io.decode_png(image, 1, dtype=tf.dtypes.uint16)
+    image = tf.expand_dims(image, axis=-1)
+    image = tf.cast(image, tf.dtypes.float32) / (2 ** bit)
+    
+    return image
+
+def read_tfrecord(example):
+    features_description = {
+        "filename": tf.io.FixedLenFeature([], tf.string),
+        "number": tf.io.FixedLenFeature([], tf.int64),
+        "sample": tf.io.FixedLenFeature([], tf.int64),
+        "image_raw": tf.io.FixedLenFeature([], tf.string),
+        "mask_raw": tf.io.FixedLenFeature([], tf.string)
+    }
+    
+    example = tf.io.parse_single_example(example, features_description, name="nii")
+    image = decode_image(example["image_raw"])
+    mask = decode_image(example["mask_raw"])
+
+    return image, mask
+
+def load_dataset(filenames):
+    dataset = tf.data.TFRecordDataset(
+        filenames,
+        compression_type="GZIP"
     )
+    dataset = dataset.shuffle(2048, reshuffle_each_iteration=False)
+    dataset = dataset.map(read_tfrecord, num_parallel_calls=tf.data.AUTOTUNE)
+    
+    return dataset
+
+def get_dataset(filenames, batch=4):
+    dataset = load_dataset(filenames)
+    dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
+    dataset = dataset.batch(batch)
+    dataset = dataset.repeat()
+    
+    return dataset
+
+
+def main(args):
+    # Load Dataset
+    x_list, y_list = split_train_test(
+        os.path.join(args.dataset, "*.tfrecord"),
+        rate=args.traing_rate
+    )
+    print(f"Train: {len(x_list)}")
+    print(f"Test: {len(y_list)}")
+    
+    train_dataset = get_dataset(train_dataset_filepaths, batch=args.batch)
+    test_dataset = get_dataset(test_dataset_filepaths)
+    
+    # Build Model
+    preprocess_input = sm.get_preprocessing(args.backbone)
+    train_dataset = preprocess_input(train_dataset)
+    model = sm.Unet(args.backbone, encoder_weights=None, input_shape=(None, None, 1))
+
     model.compile(
         'Adam',
         loss=sm.losses.dice_loss,
         metrics=[sm.metrics.iou_score, sm.metrics.f1_score],
     )
-
-    return model
-    #
-    # model.fit_generator(
-    #     generator=Sequence,
-    #     epoch=EPOCH,
-    #     batch_size=BS,
-    #     use_multiprocessing=True
-    # )
-
-
-def main(args):
-    model = build_unet_model()
     
+    # Training
+    model.fit(
+        train_dataset,
+        epochs=args.epoch,
+        steps_per_epoch=args.steps,
+        validation_data=test_dataset,
+        verbose=args.verbose
+    )
+    
+    print("fitted")
 
-if __name__ == '__main__':
-    CURRENT_DIR = os.path.abspath(os.path.join(__file__, os.pardir))
-    print(CURRENT_DIR)
+
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_name",
-                        default="ICH-Segmentation",
-                        help="Name of training model"
-                        )
-    parser.add_argument("--tfrecords_path",
-                        default="datasets/ICH_420/TFRecords/train",
-                        help="Training Dataset"
-                        )
-    parser.add_argument("--batch_size",
-                        default=8,
-                        help="Model update after go through 'batch_size' data.",
-                        type=int
-                        )
-    parser.add_argument("--learning_rate",
-                        default=1e-4,
-                        help="Initial learning rate.",
-                        type=float
-                        )
-    parser.add_argument("--loss_fn",
-                        default="dice",
-                        help="[BCE, MES, dice, ...]"
-                        )
-    parser.add_argument("--optimizer",
-                        default="sgd",
-                        help="[adam, sgd]"
-                        )
+    parser.add_argument(
+        "--backbone",
+        default="resnet101",
+        help="Model Backbone"
+    )
+    parser.add_argument(
+        "--batch",
+        default=8,
+        help="Batch Size",
+        type=int
+    )
+    parser.add_argument(
+        "--epoch",
+        default=100,
+        help="Training Epoch",
+        type=int
+    )
+    parser.add_argument(
+        "--steps",
+        default=1000,
+        help="Steps per Epoch",
+        type=int
+    )
+    parser.add_argument(
+        "--dataset",
+        default="/ich/ICH-Segmentation/datasets/ICH_420/TFRecords/train",
+        help="/path/to/dataset"
+    )
+    parser.add_argument(
+        "--traing_rate",
+        default=0.8,
+        help="Use to split dataset to 'train' and 'valid'",
+        type=float
+    )
+    parser.add_argument(
+        "--verbose",
+        default=1,
+        help="verbose",
+        type=int
+    )
     main(parser.parse_args())

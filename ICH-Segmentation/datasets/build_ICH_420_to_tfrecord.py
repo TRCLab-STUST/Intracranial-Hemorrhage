@@ -89,16 +89,14 @@ def normalize(paired_slices):
     return jnp.asarray((images, masks))
 
 
-
-_NUM_SHARDS = 4
-def _convert_dataset(paired_filepaths, split_name, output_dir):
+def _convert_dataset(paired_filepaths, split_name, output_dir, num_shards):
     num_paired_filepath = len(paired_filepaths)
-    num_per_shard = int(math.ceil(num_paired_filepath / _NUM_SHARDS))
+    num_per_shard = int(math.ceil(num_paired_filepath / num_shards))
     
-    for shard_id in trange(_NUM_SHARDS, position=1, desc=f"Shards-{split_name}"):
+    for shard_id in trange(num_shards, position=1, desc=f"Shards {split_name}", leave=False):
         output_filepath = os.path.join(
             output_dir,
-            f"{split_name}-{shard_id}-of-{_NUM_SHARDS}.tfrecord"
+            f"{split_name}-{shard_id}-of-{num_shards}.tfrecord"
         )
         with tf.io.TFRecordWriter(output_filepath,
                                   options=tf.io.TFRecordOptions(
@@ -107,13 +105,13 @@ def _convert_dataset(paired_filepaths, split_name, output_dir):
                                   )) as writer:
             start_idx = shard_id * num_per_shard
             end_idx = min((shard_id + 1) * num_per_shard, num_paired_filepath)
-            for idx in trange(start_idx, end_idx, position=2, desc="Nii"):
+            for idx in trange(start_idx, end_idx, position=2, desc="Nii", leave=False):
                 paired_file = paired_filepaths[idx]
                 filename_encode = os.path.basename(paired_file[0]).encode()
                 nii_data = NIIData(paired_file, (0, 90))
                 paired_slices = normalize(nii_data.extract_paired_slices())
                 
-                for n in trange(paired_slices.shape[1], position=3, desc="Slices"):
+                for n in trange(paired_slices.shape[1], position=3, desc="Slices", leave=False):
                     image = jnp.expand_dims(paired_slices[0, n, :, :], axis=-1)
                     mask = jnp.expand_dims(paired_slices[1, n, :, :], axis=-1)
                                        
@@ -133,14 +131,16 @@ def main(args):
     for dataset_split in tqdm(dataset_splits, position=0, desc="Processing"):
         split_name = os.path.basename(dataset_split).split(".")[0]
         output_dir = os.path.join(args.output, split_name)
-        os.makedirs(output_dir, exist_ok=True)
-
+        os.makedirs(output_dir, exist_ok=True)           
+        
         paired_filepaths = [x.strip("\n").split(",") for x in open(
             dataset_split, "r", encoding="utf-8")]
+            
+        num_shards = int(paired_filepaths[0][0])
         paired_filepaths = [(os.path.join(args.images, paired_filename[0]), os.path.join(
-            args.annotations, paired_filename[1])) for paired_filename in paired_filepaths]
+           args.annotations, paired_filename[1])) for paired_filename in paired_filepaths[1:]]
 
-        _convert_dataset(paired_filepaths, split_name, output_dir)
+        _convert_dataset(paired_filepaths, split_name, output_dir, num_shards)
 
 
 if __name__ == '__main__':
