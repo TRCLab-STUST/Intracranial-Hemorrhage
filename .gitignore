@@ -11,7 +11,16 @@
 
 ## Dataset
 **/ICH_420
+**/ICH_127
 
+## Logs
+**/logs
+**/output
+
+## Other
+.virtual_documents
+
+####
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
