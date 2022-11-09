@@ -75,7 +75,11 @@ def main(args):
     preprocess_input = sm.get_preprocessing(args.backbone)
     x_dataset = preprocess_input(x_dataset)
     y_dataset = preprocess_input(y_dataset)
-    model = sm.Unet(args.backbone, encoder_weights=None, input_shape=(None, None, 1))
+    model = sm.Unet(
+        args.backbone,
+        encoder_weights=None,
+        input_shape=(None, None, 1)
+        )
 
     model.compile(
         'Adam',

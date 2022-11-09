@@ -11,16 +11,16 @@ def unet(backbone, weight, encoder_weights=None, input_shape=(None, None, 1)):
         input_shape=input_shape
     )
     
-    dice_loss = sm.losses.DiceLoss()
-    focal_loss = sm.losses.BinaryFocalLoss()
-    totol_loss = dice_loss + (1 * focal_loss)
-    metrics = [sm.metrics.IOUScore(threshold=0.5), sm.metrics.FScore(threshold=0.5)]
+    # dice_loss = sm.losses.DiceLoss()
+    # focal_loss = sm.losses.BinaryFocalLoss()
+    # totol_loss = dice_loss + (1 * focal_loss)
+    # metrics = [sm.metrics.IOUScore(threshold=0.5), sm.metrics.FScore(threshold=0.5)]
     
-    model.compile(
-        keras.optimizers.Adam(),
-        loss=totol_loss,
-        metrics=metrics,
-    )
+    # model.compile(
+    #     keras.optimizers.Adam(),
+    #     loss=totol_loss,
+    #     metrics=metrics,
+    # )
     model.load_weights(weight)
     
     return model
@@ -57,7 +57,7 @@ def load_dataset(filenames):
 
     return dataset, n_num
 
-def get_dataset(filenames, batch=4):
+def get_dataset(filenames):
     dataset, n_num = load_dataset(filenames)
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
 
@@ -65,16 +65,16 @@ def get_dataset(filenames, batch=4):
     
 
 def main(args):
-    test_dataset = get_dataset(
+    print(args.dataset)
+    test_dataset, _ = get_dataset(
         tf.io.gfile.glob(os.path.join(args.dataset, "*.tfrecord"))
     )
     model = unet(args.backbone, args.weight)
     
-    for test in test_dataset:
-        print(test)
-        # image = image.numpy()
-        # mask = mask.numpy()
-        # pr_mask = model.predict(image).round()
+    for idx, (image, mask) in enumerate(test_dataset):
+        image = image.numpy()
+        print(image.shape, image.dtype)
+        pr_mask = model.predict(image)
         # print(pr_mask.shape)
     
 
@@ -102,7 +102,7 @@ if __name__ == "__main__":
     )
     main(parser.parse_args([
         "--backbone", "resnet101",
-        "--weight", os.path.join(os.getcwd(), "logs/ICH420-20221107165659/ICH-ICH420-31.h5"),
-        "--dataset", os.path.join(os.getcwd(), "datasets/ICH_420/TFRecords/val"),
+        "--weight", os.path.join(os.getcwd(), "/workspaces/Intracranial-Hemorrhage/ICH-Segmentation/logs/ICH420-20221107165659/ICH-ICH420-31.h5"),
+        "--dataset", os.path.join(os.getcwd(), "/workspaces/Intracranial-Hemorrhage/ICH-Segmentation/datasets/ICH_420/TFRecords/val"),
         "--output", os.path.join(os.getcwd(), "output")
     ]))
