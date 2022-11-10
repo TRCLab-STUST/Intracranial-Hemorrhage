@@ -20,6 +20,9 @@
 ## Other
 .virtual_documents
 
+## IDEA
+.idea/*
+
 ####
 
 # Byte-compiled / optimized / DLL files
